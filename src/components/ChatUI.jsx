@@ -5,6 +5,7 @@ import chatData from "../data/chatData";
 import useChatSender from "../hooks/useChatSender";
 
 import { FaFile } from "react-icons/fa6"; // Import FaFile
+import VoiceAgent from "./VoiceAgent";
 
 const ChatUI = () => {
   const [messages, setMessages] = useState(chatData);
@@ -12,7 +13,10 @@ const ChatUI = () => {
   const [attachedFile, setAttachedFile] = useState(null); // Stores the File object
   const [filePreview, setFilePreview] = useState(null); // Stores URL for image preview
   const messagesEndRef = useRef(null);
+  const [isPlaying,setIsPlaying] = useState(false);
+  const PROMPT = "Your an AI assestent help to lear English";
 
+  // const [shouldStartCall,setShouldStartCall]  = useState(false)
   const { handleSend: sendChatMessage, loading } = useChatSender(
     messages,
     setMessages,
@@ -234,6 +238,15 @@ const ChatUI = () => {
                 className={`text-pink-400 ${
                   loading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
                 }`}
+              />
+
+              <VoiceAgent
+                messages={messages}
+                setMessages={setMessages}
+                shouldStartCall={isPlaying}
+                setShouldStartCall={setIsPlaying}
+                // setGenerating={setIsLoading}
+                prompt={PROMPT}
               />
               <Send
                 onClick={handleSendButtonClick}
