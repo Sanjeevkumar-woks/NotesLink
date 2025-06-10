@@ -4,7 +4,7 @@ import Header from "./Header";
 import chatData from "../data/chatData";
 import useChatSender from "../hooks/useChatSender";
 
-import { FaFile } from "react-icons/fa6"; // Import FaFile
+import { FaFile } from "react-icons/fa6"; 
 import VoiceAgent from "./VoiceAgent";
 
 const ChatUI = () => {
@@ -13,7 +13,7 @@ const ChatUI = () => {
   const [attachedFile, setAttachedFile] = useState(null); // Stores the File object
   const [filePreview, setFilePreview] = useState(null); // Stores URL for image preview
   const messagesEndRef = useRef(null);
-  const [isPlaying,setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const PROMPT = "Your an AI assestent help to lear English";
 
   // const [shouldStartCall,setShouldStartCall]  = useState(false)
@@ -234,18 +234,17 @@ const ChatUI = () => {
                 />
               </label>
 
-              <Mic
-                className={`text-pink-400 ${
-                  loading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-                }`}
-              />
-
               <VoiceAgent
                 messages={messages}
                 setMessages={setMessages}
                 shouldStartCall={isPlaying}
                 setShouldStartCall={setIsPlaying}
-                // setGenerating={setIsLoading}
+                setGenerating={(loading) =>
+                  console.log(
+                    "You can optionally set loading state here",
+                    loading
+                  )
+                }
                 prompt={PROMPT}
               />
               <Send
