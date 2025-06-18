@@ -36,7 +36,7 @@ export default function LoginForm() {
     const enteredEmail = email.current.value;
     const enteredPassword = password.current.value;
     const validationMessage = checkValidData("",enteredEmail, enteredPassword);
-
+    console.log("Attempting login with:", { enteredEmail, enteredPassword });
     if (validationMessage) {
       setErrorMessage(validationMessage);
       return;

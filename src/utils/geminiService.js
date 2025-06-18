@@ -1,32 +1,4 @@
-// import { GoogleGenerativeAI } from "@google/generative-ai";
-
-// // Make sure your .env has: VITE_GEMINI_API_KEY=your_key
-// const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-
-// if (!API_KEY) {
-//   console.error("❌ Gemini API key not found in .env");
-// }
-
-// const genAI = new GoogleGenerativeAI(API_KEY);
-
-// const model = genAI.getGenerativeModel({
-//   model: "gemini-2.0-flash", // Changed to gemini-2.0-flash as per instructions
-// });
-
-// export const getGeminiResponse = async (prompt) => {
-//   try {
-//     const result = await model.generateContent(prompt);
-//     const response = result.response.text();
-//     return response;
-//   } catch (error) {
-//     console.error("Gemini API error:", error);
-//     return "⚠️ Failed to get response from Gemini.";
-//   }
-// };
-
-
-
-// geminiService.js
+// 
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
@@ -39,39 +11,33 @@ if (!API_KEY) {
 const genAI = new GoogleGenerativeAI(API_KEY);
 
 const model = genAI.getGenerativeModel({
-  model: "gemini-2.0-flash", // Or 'gemini-1.5-flash-latest' if you want a more capable model
+  model: "gemini-1.5-flash-latest",
 });
 
 let chat = null; // Persist the chat session
+let currentSystemInstruction = null; // Track the current system instruction
 
 export const getGeminiResponse = async (
   promptContent,
-  conversationHistory = []
+  conversationHistory = [],
+  systemPrompt = "" // Added systemPrompt parameter
 ) => {
   try {
-    if (!chat) {
-      const filteredHistory = conversationHistory.filter((msg, index) => {
-        if (index === 0 && msg.sender !== "user") {
-          return false;
-        }
-        return true;
-      });
+    // Format the systemPrompt as a Content object if it's a string
+    const formattedSystemInstruction = systemPrompt
+      ? { parts: [{ text: systemPrompt }] }
+      : undefined; // Use undefined if no system prompt
 
+    // Reset chat if the system prompt changes or if chat is null
+    if (!chat || systemPrompt !== currentSystemInstruction) {
+      currentSystemInstruction = systemPrompt; // Update the tracked system instruction
       chat = model.startChat({
-        history: filteredHistory.map((msg) => {
-          // Map history, handling potential file content if you stored it in messages state
-          // For simplicity, we'll assume past messages in history are primarily text.
-          // If you need to send *previous* image attachments to Gemini, you'd need
-          // to store their base64 data in the `messages` state and map them here.
-          return {
-            role: msg.sender === "user" ? "user" : "model",
-            // If msg.text is plain text or the primary part
-            parts: [{ text: msg.text }],
-          };
-        }),
+        history: conversationHistory, // This now expects an array of { role, parts }
         generationConfig: {
           maxOutputTokens: 500,
         },
+        // Pass the formatted system instruction
+        systemInstruction: formattedSystemInstruction,
       });
     }
 
@@ -86,10 +52,14 @@ export const getGeminiResponse = async (
   } catch (error) {
     console.error("Gemini API error:", error);
     chat = null; // Reset chat on error
+    currentSystemInstruction = null; // Also reset the system instruction tracker
     return "⚠️ Failed to get response from Gemini.";
   }
 };
 
 export const resetGeminiChat = () => {
   chat = null;
+  currentSystemInstruction = null; // Reset system instruction on chat reset
 };
+
+export default getGeminiResponse;

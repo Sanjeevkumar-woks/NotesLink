@@ -1,206 +1,166 @@
-// src/hooks/useChatSender.js
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import * as pdfjs from "pdfjs-dist";
-import { getGeminiResponse } from "../utils/geminiService";
-import { cleanText } from "../utils/cleanText";
-
-// Set PDF.js worker source (should be done once globally or in the hook if specific to it)
-// It's generally better to keep this global if pdfjs is used across multiple components.
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
-
-const readFileAsBase64 = (file) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64String = reader.result.split(",")[1];
-      resolve(base64String);
-    };
-    reader.onerror = (error) => reject(error);
-    reader.readAsDataURL(file);
-  });
-};
-
-const readFileAsArrayBuffer = (file) => {
-  return new Promise((resolve, reject) => {
-    const arrayBufferReader = new FileReader();
-    arrayBufferReader.onload = () => resolve(arrayBufferReader.result);
-    arrayBufferReader.onerror = (error) => reject(error);
-    arrayBufferReader.readAsArrayBuffer(file);
-  });
-};
-
-const parsePdfBytesToText = async (pdfBytes) => {
-  try {
-    const pdfDocument = await pdfjs.getDocument({ data: pdfBytes }).promise;
-    let fullText = "";
-
-    for (let i = 1; i <= pdfDocument.numPages; i++) {
-      const page = await pdfDocument.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items.map((item) => item.str).join(" ");
-      fullText += pageText + "\n";
-    }
-    return fullText;
-  } catch (error) {
-    console.error("Error parsing PDF with pdfjs-dist:", error);
-    throw new Error("Failed to extract text from PDF using pdfjs-dist.");
-  }
-};
 
 const useChatSender = (
   messages,
   setMessages,
   setInput,
   setAttachedFile,
-  setFilePreview
+  setFilePreview,
+  systemPrompt
 ) => {
   const [loading, setLoading] = useState(false);
 
-  const handleSend = useCallback(
-    async (input, attachedFile) => {
-      if (input.trim() === "" && !attachedFile) return;
+  // Process file content for both chat and voice
+  const processFileContent = async (file) => {
+    try {
+      if (file.type === "application/pdf") {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdfDocument = await pdfjs.getDocument({ data: arrayBuffer })
+          .promise;
+        let fullText = "";
 
-      let userMessageText = input;
-      let geminiInputContent = input;
-      let currentFilePreview = null; // Store file preview for user message
-
-      if (attachedFile) {
-        userMessageText = `📎 Attached: ${attachedFile.name}`;
-        if (input.trim() !== "") {
-          userMessageText += `\n${input}`;
+        for (let i = 1; i <= pdfDocument.numPages; i++) {
+          const page = await pdfDocument.getPage(i);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items.map((item) => item.str).join(" ");
+          fullText += pageText + "\n";
         }
 
-        setLoading(true);
-
-        try {
-          const fileType = attachedFile.type;
-          if (fileType.startsWith("image/")) {
-            currentFilePreview = URL.createObjectURL(attachedFile);
-            const fileContent = await readFileAsBase64(attachedFile);
-            geminiInputContent = [
-              { text: input },
-              {
-                inlineData: {
-                  mimeType: fileType,
-                  data: fileContent,
-                },
-              },
-            ];
-          } else if (fileType.startsWith("text/")) {
-            const fileContent = await readFileAsBase64(attachedFile);
-            geminiInputContent = `${input}\n${atob(fileContent)}`;
-          } else if (fileType === "application/pdf") {
-            try {
-              const pdfBytes = await readFileAsArrayBuffer(attachedFile);
-              const extractedText = await parsePdfBytesToText(pdfBytes);
-              geminiInputContent = `${input}\nPDF Content:\n${extractedText}`;
-            } catch (pdfError) {
-              console.error("Error processing PDF:", pdfError);
-              setMessages((prev) => [
-                ...prev,
-                {
-                  sender: "assistant",
-                  text: `Could not process PDF: ${pdfError.message}`,
-                  time: new Date().toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  }),
-                },
-              ]);
-              setLoading(false);
-              return;
-            }
-          } else if (
-            fileType === "application/msword" ||
-            fileType ===
-              "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-          ) {
-            geminiInputContent = `${input}\nAttached file: ${attachedFile.name} (Type: ${fileType})\nNote: Direct content extraction for this document type is not supported in this demo.`;
-            alert(
-              "Direct content extraction for Word documents (.doc, .docx) is not fully supported in this demo. Sending file name only to AI."
-            );
-          } else {
-            geminiInputContent = `${input}\nAttached file: ${attachedFile.name} (Type: ${fileType})`;
-            alert(
-              "Unsupported file type for direct AI processing. Sending file name only."
-            );
-          }
-        } catch (error) {
-          console.error("Error reading file:", error);
-          setLoading(false);
-          setMessages((prev) => [
-            ...prev,
-            {
-              sender: "assistant",
-              text: "Could not read file content. Please try again.",
-              time: new Date().toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              }),
-            },
-          ]);
-          return;
-        }
+        return fullText.trim();
+      } else if (file.type.startsWith("text/")) {
+        return await file.text();
+      } else if (file.type.startsWith("image/")) {
+        return `[Image file: ${file.name} - Image content available for analysis]`;
       }
 
+      return `[File: ${file.name} - Content type: ${file.type}]`;
+    } catch (error) {
+      console.error("Error processing file:", error);
+      return `[Error processing file: ${file.name}]`;
+    }
+  };
+
+  const handleSend = async (input, attachedFile) => {
+    if ((!input.trim() && !attachedFile) || loading) return;
+
+    setLoading(true);
+
+    try {
+      // Process file content if file is attached
+      let fileContent = null;
+      if (attachedFile) {
+        fileContent = await processFileContent(attachedFile);
+      }
+
+      // Create user message with file info
       const userMessage = {
+        id: Date.now().toString(),
+        text:
+          input.trim() ||
+          (attachedFile ? `Sent file: ${attachedFile.name}` : ""),
         sender: "user",
-        text: userMessageText,
-        file: attachedFile ? attachedFile.name : null,
-        filePreview: currentFilePreview, // Use the dynamically set preview
-        fileType: attachedFile ? attachedFile.type : null,
         time: new Date().toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
         }),
+        ...(attachedFile && {
+          file: attachedFile.name,
+          fileType: attachedFile.type,
+          filePreview: attachedFile.type.startsWith("image/")
+            ? URL.createObjectURL(attachedFile)
+            : null,
+          fileContent: fileContent, // Include file content for voice agent
+        }),
       };
 
-      const currentConversationHistory = [...messages, userMessage];
-      setMessages(currentConversationHistory);
-      setInput("");
-      setAttachedFile(null);
-      setFilePreview(null); // Clear file preview after sending
+      setMessages((prev) => [...prev, userMessage]);
 
-      if (!attachedFile) setLoading(true);
+      // Prepare API request
+      const conversationHistory = [
+        {
+          role: "system",
+          content: systemPrompt,
+        },
+        ...messages.map((msg) => ({
+          role: msg.sender === "user" ? "user" : "assistant",
+          content: msg.text,
+        })),
+      ];
 
-      try {
-        const response = await getGeminiResponse(
-          geminiInputContent,
-          currentConversationHistory
-        );
-        const plainText = cleanText(response);
+      // Add current message to history
+      let currentMessageContent = input.trim();
 
-        const assistantMessage = {
+      if (attachedFile && fileContent) {
+        currentMessageContent += `\n\n[File: ${attachedFile.name}]\n${fileContent}`;
+      }
+
+      conversationHistory.push({
+        role: "user",
+        content: currentMessageContent,
+      });
+
+      // Make API call
+      const response = await fetch(
+        "https://api.openai.com/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            messages: conversationHistory,
+            max_tokens: 1000,
+            temperature: 0.7,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const assistantMessage = data.choices[0].message.content;
+
+      // Add assistant response
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          text: assistantMessage,
           sender: "assistant",
-          text: plainText,
           time: new Date().toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
           }),
-        };
+        },
+      ]);
+    } catch (error) {
+      console.error("Error sending message:", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          text: "Sorry, I encountered an error while processing your request. Please try again.",
+          sender: "assistant",
+          time: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        },
+      ]);
+    } finally {
+      setLoading(false);
+      setInput("");
+      setAttachedFile(null);
+      setFilePreview(null);
+    }
+  };
 
-        setMessages((prev) => [...prev, assistantMessage]);
-      } catch (error) {
-        console.error("Error fetching Gemini response:", error);
-        setMessages((prev) => [
-          ...prev,
-          {
-            sender: "assistant",
-            text: "Oops! Something went wrong getting an AI response. Please try again.",
-            time: new Date().toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-          },
-        ]);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [messages, setMessages, setInput, setAttachedFile, setFilePreview] // Dependencies for useCallback
-  );
-
-  return { handleSend, loading, setLoading };
+  return { handleSend, loading };
 };
 
 export default useChatSender;

@@ -10,7 +10,7 @@ const getCurrentTime = () => {
 
 const chatData = [
   {
-    sender: "assistant",
+    sender: "dot",
     text: "Hello! I'm your AI assistant. How can I help you today?",
     time: getCurrentTime(), // This will now be dynamic!
   },
