@@ -269,39 +269,10 @@ const VoiceAgent = ({
         const updateSuccess = updateSessionInstructions();
 
         if (updateSuccess) {
+          // eslint-disable-next-line no-unused-vars
           const totalDocs = documentHistoryRef.current.length;
 
-          // Show notification about file update
-          if (attachedFile && currentFileStateId !== lastFileStateId) {
-            const msg = {
-              id: Date.now().toString(),
-              text: `📎 New file attached: ${attachedFile.name}. I now have access to ${totalDocs} document(s) and can answer questions about any of them.`,
-              sender: "assistant",
-              time: new Date().toLocaleTimeString(),
-            };
-            setMessages((prev) => [...prev, msg]);
-          } else if (messages.length > lastProcessedMessagesRef.current) {
-            // New messages with potential files
-            const newFilesCount = extractFilesFromMessages().length;
-            if (newFilesCount > 0) {
-              const msg = {
-                id: Date.now().toString(),
-                text: `📚 I've processed your recent messages and now have access to ${totalDocs} document(s). Feel free to ask questions about any of them!`,
-                sender: "assistant",
-                time: new Date().toLocaleTimeString(),
-              };
-              setMessages((prev) => [...prev, msg]);
-            }
-          } else if (lastFileStateId && !currentFileStateId) {
-            // File was removed, but we still might have history
-            const msg = {
-              id: Date.now().toString(),
-              text: `📎 Current file removed, but I still have access to ${totalDocs} document(s) from our conversation.`,
-              sender: "assistant",
-              time: new Date().toLocaleTimeString(),
-            };
-            setMessages((prev) => [...prev, msg]);
-          }
+          
         }
       }, 100);
     }

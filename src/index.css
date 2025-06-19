@@ -22,40 +22,39 @@
   
   
   /* AI Waiting Animation */
-  .ai-waiting-dots {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start; /* Align to start like assistant messages */
-    height: 20px; /* Adjust height as needed */
-    padding-left: 8px; /* Give some padding */
+  /* Existing styles (if any) */
+
+.ai-bouncing-dots {
+  display: flex;
+  align-items: flex-end; /* Aligns dots to the bottom for a "bouncing" effect */
+  gap: 4px; /* Space between dots */
+}
+
+.ai-bouncing-dot {
+  width: 8px; /* Size of the dot */
+  height: 8px; /* Size of the dot */
+  background-color: #a78bfa; /* Dot color (purple-400 equivalent) */
+  border-radius: 50%;
+  animation: bounce 1.4s infinite ease-in-out;
+}
+
+.ai-bouncing-dot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.ai-bouncing-dot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+.ai-bouncing-dot:nth-child(3) {
+  animation-delay: 0s;
+}
+
+@keyframes bounce {
+  0%, 80%, 100% {
+    transform: translateY(0);
   }
-  
-  .ai-waiting-dot {
-    width: 8px;
-    height: 8px;
-    background-color: #a78bfa; /* A purple tone matching your theme */
-    border-radius: 50%;
-    margin: 0 2px;
-    animation: pulse 1.4s infinite ease-in-out both;
+  40% {
+    transform: translateY(-10px); /* How high the dots bounce */
   }
-  
-  .ai-waiting-dot:nth-child(1) {
-    animation-delay: -0.32s;
-  }
-  
-  .ai-waiting-dot:nth-child(2) {
-    animation-delay: -0.16s;
-  }
-  
-  .ai-waiting-dot:nth-child(3) {
-    animation-delay: 0s;
-  }
-  
-  @keyframes pulse {
-    0%, 80%, 100% {
-      transform: scale(0);
-    }
-    40% {
-      transform: scale(1);
-    }
-  }
+}
